@@ -11,9 +11,13 @@
 #define SUCCESS 0
 #define FAILURE 1
 
-const unsigned long int GPUTHREADS = 100000;
-const unsigned int HASH_LENGTH = 64;
 using namespace std;
+
+
+string shello = "hello";
+const unsigned long int GPUTHREADS = 10;
+const unsigned int HASH_LENGTH = 64;
+
 
 /* convert the kernel file into a string */
 int convertToString(const char *filename, std::string& s)
@@ -51,9 +55,9 @@ int convertToString(const char *filename, std::string& s)
 
 
 int RunGpuCode_OpenCL( const char *filename,
-						const char* input,
-						 char* output,
-					  const char* kernel_name
+					   const char* input,
+					   char* output,
+					   const char* kernel_name
 					)
 {
 	/*Step1: Getting platforms and choose an available one.*/
@@ -172,12 +176,13 @@ int main(int argc, char* argv[])
 	
 	std::vector <string> vStrings;
 
-	string shello = "Hello";
+
 	string  newstr;
 	char bff[16] = "\0";
-	for (int counter = 0; counter < GPUTHREADS; ++counter) 
+	int startoffset = 0; 
+	for (int counter = startoffset; counter < GPUTHREADS+ startoffset; ++counter)
 	{
-		sprintf(bff, "%d;", counter);
+		sprintf(bff, "%x;", counter);
 		string tmp = shello;
 		tmp.append(string(bff));
 		newstr = newstr.append(tmp);
@@ -193,20 +198,22 @@ int main(int argc, char* argv[])
 	int te = GetTickCount();
 
 	//cout << "\nEnd Counter = " << te - ts << endl;
-
-
+	
 	std::vector <string> hashCollection;
+	
 	std::vector <string> ::iterator itr = vStrings.begin();
+	
 	char buff[65] = { '\0' };
 
 	ts = GetTickCount();
+	
 	for (int k = 0; k < GPUTHREADS; k++)
 	{
 		
 
 		unsigned char* travStart = &output[k * 64];
 
-		sprintf(buff, "%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x",
+		sprintf(buff, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
 			travStart[0], travStart[2], travStart[4], travStart[6], travStart[8],
 			travStart[10], travStart[12], travStart[14], travStart[16], travStart[18],
 			travStart[20], travStart[22], travStart[24], travStart[26], travStart[28],
@@ -218,14 +225,25 @@ int main(int argc, char* argv[])
 		
 		buff[64] = '\0';
 
-		//string tmp = buff;
+		string tmp = buff;
 
-		hashCollection.push_back(string(buff));	
+		hashCollection.push_back(tmp);	
 
 	}
 
 	te = GetTickCount();
 
+	//ofstream ofs("hash.out", std::ofstream::out); 
+
+	//std::vector <string> ::iterator hitr = hashCollection.begin();
+	//while ( itr != vStrings.end())
+	//{
+	//	ofs << *itr << "," << *hitr << endl;
+	//	itr++;
+	//	hitr++;
+	//}
+
+	//ofs.close();
 	//cout << "\n Loop Assignment in Vector = " << te - ts << endl;
 
 	cout << "\n Got String collection Vector length = " << hashCollection.size() << endl;
