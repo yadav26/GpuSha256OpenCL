@@ -12,14 +12,23 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <map>
 #include <fstream>
 #include "Windows.h"
 #define SUCCESS 0
 #define FAILURE 1
 
-const unsigned long int GPUTHREADS = 1000;
+
+
+const unsigned long int GPUTHREADS = 100000;
 const unsigned int HASH_LENGTH = 64;
 using namespace std;
+
+const char *filename = "GpuSha256_Nonce_Kernel.cl.cpp";
+const char* kernel_name = "sha256_nonce";
+string shello = "hello";
+UINT64 start = 0;//0x3f522c - 2;
+
 
 typedef struct {
 	cl_kernel kernel;
@@ -72,116 +81,6 @@ int convertToString(const char *filename, std::string& s)
 	return FAILURE;
 }
 
-
-int RunGpuCode_OpenCL(const char *filename,
-	const char* input,
-	char* output,
-	const char* kernel_name
-)
-{
-	/*Step1: Getting platforms and choose an available one.*/
-	cl_uint numPlatforms;	//the NO. of platforms
-	cl_platform_id platform = NULL;	//the chosen platform
-	cl_int	status = clGetPlatformIDs(0, NULL, &numPlatforms);
-	if (status != CL_SUCCESS)
-	{
-		cout << "Error: Getting platforms!" << endl;
-		return FAILURE;
-	}
-
-	/*For clarity, choose the first available platform. */
-	if (numPlatforms > 0)
-	{
-		cl_platform_id* platforms = (cl_platform_id*)malloc(numPlatforms * sizeof(cl_platform_id));
-		status = clGetPlatformIDs(numPlatforms, platforms, NULL);
-		platform = platforms[0];
-		free(platforms);
-	}
-
-	/*Step 2:Query the platform and choose the first GPU device if has one.Otherwise use the CPU as device.*/
-	cl_uint				numDevices = 0;
-	cl_device_id        *devices;
-	status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
-	if (numDevices == 0)	//no GPU available.
-	{
-		cout << "No GPU device available." << endl;
-		cout << "Choose CPU as default device." << endl;
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, 0, NULL, &numDevices);
-		devices = (cl_device_id*)malloc(numDevices * sizeof(cl_device_id));
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_CPU, numDevices, devices, NULL);
-	}
-	else
-	{
-		devices = (cl_device_id*)malloc(numDevices * sizeof(cl_device_id));
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
-	}
-
-
-	/*Step 3: Create context.*/
-	cl_context context = clCreateContext(NULL, 1, devices, NULL, NULL, NULL);
-
-	/*Step 4: Creating command queue associate with the context.*/
-	cl_command_queue commandQueue = clCreateCommandQueue(context, devices[0], 0, NULL);
-
-	/*Step 5: Create program object */
-
-	string sourceStr;
-	status = convertToString(filename, sourceStr);
-	const char *source = sourceStr.c_str();
-	size_t sourceSize[] = { strlen(source) };
-	cl_program program = clCreateProgramWithSource(context, 1, &source, sourceSize, NULL);
-
-	/*Step 6: Build program. */
-	status = clBuildProgram(program, 1, devices, NULL, NULL, NULL);
-	if (status < 0)
-	{
-		cout << "Kernel has syntax errors, compilation failed. Err = " << status << endl;
-		return 0;
-	}
-
-	size_t inStrlength = strlen(input);
-	//cout << "input string : [" << input << "]" << endl;
-	int outputlength = HASH_LENGTH * GPUTHREADS;
-	size_t outputSize = outputlength * sizeof(char);
-
-	cl_mem inputBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (inStrlength + 1) * sizeof(char), (void *)input, NULL);
-	cl_mem outputBuffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, outputSize, NULL, NULL);
-	//cl_mem outputBuffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, (outputSize + 1) * sizeof(char), NULL, NULL);
-
-	/*Step 8: Create kernel object */
-	cl_kernel kernel = clCreateKernel(program, kernel_name, NULL);
-
-	/*Step 9: Sets Kernel arguments.*/
-	status = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&inputBuffer);
-	status = clSetKernelArg(kernel, 1, sizeof(cl_int), (void *)&inStrlength);
-	status = clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&outputBuffer);
-	status = clSetKernelArg(kernel, 3, sizeof(cl_int), (void *)&outputSize);
-
-	/*Step 10: Running the kernel.*/
-	size_t global_work_size[1] = { GPUTHREADS };
-	status = clEnqueueNDRangeKernel(commandQueue, kernel, 1, NULL, global_work_size, NULL, 0, NULL, NULL);
-
-	/*Step 11: Read the cout put back to host memory.*/
-	status = clEnqueueReadBuffer(commandQueue, outputBuffer, CL_TRUE, 0, outputSize, output, 0, NULL, NULL);
-
-
-	/*Step 12: Clean the resources.*/
-	status = clReleaseKernel(kernel);				//Release kernel.
-	status = clReleaseProgram(program);				//Release the program object.
-	status = clReleaseMemObject(inputBuffer);		//Release mem object.
-	status = clReleaseMemObject(outputBuffer);
-	status = clReleaseCommandQueue(commandQueue);	//Release  Command queue.
-	status = clReleaseContext(context);				//Release context.
-
-
-	if (devices != NULL)
-	{
-		free(devices);
-		devices = NULL;
-	}
-
-	return status;
-}
 
 cl_int ReleaseOCL(OCL_INSTANCE* pOcl)
 {
@@ -288,14 +187,14 @@ cl_int InitializeOCL(OCL_INSTANCE *pOcl,
 	if (status < 0)
 	{
 		cout << "Kernel has syntax errors, compilation failed. Err = " << status << endl;
-		return 0;
+		return status;
 	}
 
 
-	size_t inStrlength = strlen(input);
+	//size_t inStrlength = strlen(input);
 	//cout << "input string : [" << input << "]" << endl;
-	int outputlength = HASH_LENGTH * GPUTHREADS;
-	size_t outputSize = outputlength * sizeof(char);
+	//int outputlength = HASH_LENGTH * GPUTHREADS;
+	//size_t outputSize = outputlength * sizeof(char);
 
 	//pOcl->inputBuffer = clCreateBuffer(pOcl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (inStrlength + 1) * sizeof(char), (void *)input, NULL);
 	//pOcl->outputBuffer = clCreateBuffer(pOcl->context, CL_MEM_WRITE_ONLY, outputSize, NULL, NULL);
@@ -305,15 +204,17 @@ cl_int InitializeOCL(OCL_INSTANCE *pOcl,
 }
 
 cl_int RunGpu_Loads( POCL_INSTANCE pOcl,
-									const char* input,
-									char* output,
-									const char* kernel_name )
+					const char* input,
+					char* output,
+					const char* kernel_name,
+					cl_ulong startIndex, 
+					cl_uint outputSize )
 {
 
 	size_t inStrlength = strlen(input);
 	//cout << "input string : [" << input << "]" << endl;
 	int outputlength = HASH_LENGTH * GPUTHREADS;
-	size_t outputSize = outputlength * sizeof(char);
+//	size_t outputSize = outputSize; //outputlength * sizeof(char);
 
 	pOcl->inputBuffer = clCreateBuffer(pOcl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (inStrlength + 1) * sizeof(char), (void *)input, NULL);
 	pOcl->outputBuffer = clCreateBuffer(pOcl->context, CL_MEM_WRITE_ONLY, outputSize, NULL, NULL);
@@ -321,11 +222,13 @@ cl_int RunGpu_Loads( POCL_INSTANCE pOcl,
 	/*Step 8: Create kernel object */
 	pOcl->kernel = clCreateKernel(pOcl->program, kernel_name, NULL);
 
+	cl_int outStringlen = -1;
 	/*Step 9: Sets Kernel arguments.*/
 	cl_int status = clSetKernelArg(pOcl->kernel, 0, sizeof(cl_mem), (void *)&pOcl->inputBuffer);
 	status = clSetKernelArg(pOcl->kernel, 1, sizeof(cl_int), (void *)&inStrlength);
 	status = clSetKernelArg(pOcl->kernel, 2, sizeof(cl_mem), (void *)&pOcl->outputBuffer);
-	status = clSetKernelArg(pOcl->kernel, 3, sizeof(cl_int), (void *)&outputSize);
+	status = clSetKernelArg(pOcl->kernel, 3, sizeof(cl_int), (void *)&outStringlen);
+	status = clSetKernelArg(pOcl->kernel, 4, sizeof(cl_ulong), (void *)&startIndex);
 
 	/*Step 10: Running the kernel.*/
 	size_t global_work_size[1] = { GPUTHREADS };
@@ -341,7 +244,8 @@ cl_int RunGpu_Loads( POCL_INSTANCE pOcl,
 
 	pOcl->inputBuffer = NULL;
 	pOcl->outputBuffer = NULL;
-	return status;
+
+	return (cl_int)outStringlen;
 
 }
 
@@ -352,21 +256,18 @@ cl_int RunGpu_Loads( POCL_INSTANCE pOcl,
 int main(int argc, char* argv[])
 {
 
-	const char *filename = "GpuSha256_Kernel.cl.cpp";
 
-	int outputSize = 64 * GPUTHREADS;
+	
+	int outputSize = sizeof(char) * (shello.length() * HASH_LENGTH  * 2 );
 
 	unsigned char* output = (unsigned char *)malloc(outputSize);
 
-	const char* kernel_name = "sha256";
 
 	std::vector <string> vStrings;
 
-	string shello = "Hello";
-
 	char bff[64] = "\0";
 
-	UINT64 start = 0;// 0x3f522c - 1000;
+	
 	
 
 	cout << "\nGPUTHREADS #  " << GPUTHREADS << endl;
@@ -385,96 +286,104 @@ int main(int argc, char* argv[])
 	string  newstr=shello;
 
 	
-	//UINT64 counter = 0;
-	//for (; counter < GPUTHREADS; ++counter)
-	//{
-	//	memset(bff, '\0', 64);
-	//	sprintf(bff, "%x;", start + counter);
-	//	string tmp = shello;
-	//	tmp.append(string(bff));
-	//	newstr = newstr.append(tmp);
-	//	vStrings.push_back(tmp);
-	//}
-
 	cl_int	status = InitializeOCL(&g_oclInstance, filename, newstr.c_str(), output);
-
+	if (status != 0)
+	{
+		return 0;
+	}
 	//newstr.clear();
 
 	//vStrings.clear();
 
-	while( hashCollection.size() <= 0  )
+	char buff[65] = { '\0' };
+	std::pair <string, string> kvp;
+	std::map<string, string> MapNonce;
+
+	//while( hashCollection.size() < 1  )
+	while(MapNonce.size() < 100 )
+	//while(start < start+ 4*GPUTHREADS)
 	{
 
-		newstr.clear();
-		vStrings.clear();
-
-		UINT64 counter = 0;
-		for (; counter < GPUTHREADS; ++counter)
-		{
-			memset(bff, '\0', 64);
-			sprintf(bff, "%x;", start+counter);
-			string tmp = shello;
-			tmp.append(string(bff));
-			newstr = newstr.append(tmp);
-			vStrings.push_back(tmp);
-		}
-
-		start += counter;
 
 		int inlength = newstr.length();
 		memset(output, '\0', outputSize);
-		int ts = GetTickCount();
-		status = RunGpu_Loads(&g_oclInstance, newstr.c_str(), (char*)output, kernel_name);
+		//int ts = GetTickCount();
+		status = RunGpu_Loads(&g_oclInstance, newstr.c_str(), (char*)output, kernel_name, start, outputSize );
 
-		int te = GetTickCount();
+		//int te = GetTickCount();
 
 		//cout << "\nEnd Counter = " << te - ts << endl;
 
-		char buff[65] = { '\0' };
-
 		//ts = GetTickCount();
+
+		start += GPUTHREADS;
+
 		for (int k = 0; k < GPUTHREADS; k++)
 		{
-			unsigned char* travStart = &output[k * 64];
+			int outlen = -1;
+			if (output[0] == '\0')
+				continue;
 
-			if (travStart[0] == 0x00 )
-				if(travStart[2] == 0x00 )
-					if(travStart[4] == 0x00 )
-					{
+			unsigned char* travStart = output;
+			string noncestr;
+			char bftochar[2];
+			while (travStart[++outlen] -! '-' )
+			{
+				if (travStart[outlen] == '-')
+					break;
+				sprintf(bftochar, "%c", travStart[outlen]);
+				noncestr.append(string( bftochar));
 
-						sprintf(buff, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-							travStart[0], travStart[2], travStart[4], travStart[6], travStart[8],
-							travStart[10], travStart[12], travStart[14], travStart[16], travStart[18],
-							travStart[20], travStart[22], travStart[24], travStart[26], travStart[28],
-							travStart[30], travStart[32], travStart[34], travStart[36], travStart[38],
-							travStart[40], travStart[42], travStart[44], travStart[46], travStart[48],
-							travStart[50], travStart[52], travStart[54], travStart[56], travStart[58],
-							travStart[60], travStart[62]
-						);
+				//cout << travStart[outlen] << " " ;
 
-						buff[64] = '\0';
-						cout << "\n This is '4x0' ***SHA for  = " << string(buff);
-						cout << "\n Number = " << vStrings[k] << endl;
+			}
+		
+			travStart = &travStart[outlen +1];
 
-						hashCollection.push_back(string(buff));
-						nonce = vStrings[k];
-						break;
+			sprintf(buff, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+				travStart[0], travStart[1], travStart[2], travStart[3], travStart[4],
+				travStart[5], travStart[6], travStart[7], travStart[8], travStart[9],
+				travStart[10], travStart[11], travStart[12], travStart[13], travStart[14],
+				travStart[15], travStart[16], travStart[17], travStart[18], travStart[19],
+				travStart[20], travStart[21], travStart[22], travStart[23], travStart[24],
+				travStart[25], travStart[26], travStart[27], travStart[28], travStart[29],
+				travStart[30], travStart[31]
+			);
 
-					}
+			travStart[32] = '\0';
+
+			string tmp = buff;
+
+			//cout << tmp << endl;
 			
+			noncestr = noncestr.substr(5, noncestr.size() );
+			
+			MapNonce.insert(pair <string, string>(tmp, noncestr));
+
+			hashCollection.push_back(tmp);
+
+
+			memset(output, '\0', outputSize );
 
 		}
-		
-		//cout << "\n 0x"<<hex << start<<dec <<" - decimal_start = " << start << endl;
 
+
+		//cout << "\n 0x"<<hex << start<<dec <<" - decimal_start = " << start << endl;
 	
 	}
 
 	long int teNonce = GetTickCount();
 
-	cout << "\n Nonce found in  time = " << teNonce - tsNonce << endl;
-	cout << "\n Nonce = 0x" <<hex<< start << endl;
+	cout << "\n Input String = " << shello << endl;
+	
+	map<string, string> ::iterator it = MapNonce.begin();
+	
+	int i_hex = std::stoi((it->second).c_str(), nullptr, 16);
 
+	
+	cout << "\n Nonce = 0x " <<hex<< i_hex << endl;
+	cout << "\n HASH =  " << it->second.c_str() << endl << dec ;
+	cout << "\n Nonce found in  time = " << teNonce - tsNonce << endl;
 	if (output != NULL)
 	{
 		free(output);

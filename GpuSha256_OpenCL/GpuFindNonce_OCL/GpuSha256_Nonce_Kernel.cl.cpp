@@ -40,18 +40,121 @@ Ported from opensource sha C++ code.
 #define DIGEST_SIZE (256 / 8)
 #define SHA224_256_BLOCK_SIZE  (512 / 8)
 
-
-__kernel void sha256(__global char* input, int inlen, __global unsigned char* out)
+void swap(char *str1, char *str2)
 {
+	//printf("SWAP - before s[ %c ] , d[%c]", str1, str2);
+	char *temp = str1;
+	str1 = str2;
+	str2 = temp;
+
+	//printf("SWAP - after s[ %c ] , d[%c]", str1, str2 );
+}
+
+
+/* A utility function to reverse a string  */
+void reverse(char *str, int length)
+{
+	int start = 0;
+	int end = length-1;
+
+	//for (int cnt = 0; cnt < end; ++cnt)
+	//{
+	//	printf("Reverse - str [ %d ] = [%c]", cnt, str[cnt]);
+	//}
+
+	while (start < end)
+	{
+		//printf("Before [%c,%c]", *(str + start), *(str + end));
+		swap(*(str + start), *(str + end));
+		//printf("After [%c,%c]", *(str + start), *(str + end));
+
+		start++;
+		end--;
+	}
+	return;
+}
+
+// Implementation of itoa()
+int myitoa(int num, char* str, int base)
+{
+
+	int i = 0;
+	bool isNegative = false;
+
+	// Handle 0 explicitely, otherwise empty string is printed for 0 
+	if (num == 0)
+	{
+		str[i++] = '0';
+		str[i] = '\0';
+		return i;
+	}
+
+	// In standard itoa(), negative numbers are handled only with 
+	// base 10. Otherwise numbers are considered unsigned.
+	if (num < 0 && base == 10)
+	{
+		isNegative = true;
+		num = -num;
+	}
+
+	// Process individual digits
+	while (num != 0)
+	{
+		int rem = num % base;
+		str[i++] = (rem > 9) ? (rem - 10) + 'a' : rem + '0';
+		num = num / base;
+	}
+
+	// If number is negative, append '-'
+	if (isNegative)
+		str[i++] = '-';
+
+	
+	// Reverse the string
+	reverse(str, i);
+
+	return i;
+
+}
+
+//char* itoa(int val, int base) {
+//
+//	static char buf[32] = { 0 };
+//
+//	int i = 30;
+//
+//	for (; val && i; --i, val /= base)
+//
+//		buf[i] = "0123456789abcdef"[val % base];
+//
+//	return &buf[i + 1];
+//
+//}
+
+/*
+Block size on Bit chain is 1 MB
+inlen == sizeof(char) * 1000 * 1000 == 1 MegaBytes
+*/
+
+__kernel void sha256_nonce( __global char* input, 
+							int inlen, 
+							__global unsigned char* out,  
+							int outlen,
+							unsigned long startIndex )
+{
+	
+
+	
+
 	unsigned int m_len = 0;
 	unsigned int m_tot_len = 0;
-	
+
 	unsigned int pm_len;
 	unsigned int len_b;
 	unsigned int block_nb;
 	unsigned int new_len, rem_len, tmp_len;
-	
-	unsigned int len = 0;
+
+	unsigned int final_length = 0;
 	uint w[64];
 	uint wv[8];
 	uint t1, t2;
@@ -63,12 +166,12 @@ __kernel void sha256(__global char* input, int inlen, __global unsigned char* ou
 	unsigned char digest[DIGEST_SIZE] = { 0 };
 	unsigned char m_block[128];
 	char *shifted_message;
-	char* in[512] = {'\0'};
+	char* in[512] = { '\0' };
 
 	int num = get_global_id(0);
-	
+
 	int gsha256_k[64] = //UL = uint32
-	{	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+	{ 0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
 		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
 		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
 		0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -85,8 +188,8 @@ __kernel void sha256(__global char* input, int inlen, __global unsigned char* ou
 		0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
 		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2 };
 
-	
-	uint m_h[8] = {0};
+
+	uint m_h[8] = { 0 };
 	m_h[0] = 0x6a09e667;
 	m_h[1] = 0xbb67ae85;
 	m_h[2] = 0x3c6ef372;
@@ -106,41 +209,80 @@ __kernel void sha256(__global char* input, int inlen, __global unsigned char* ou
 	int bc = 0;
 	int lpos = 0;
 	int cnt = 0;
-	char tmp[64];
+	char tmp[64] ;
 
-		while (input[++ipos] != '\0')
+	/*while (input[++ipos] != '\0')
+	{
+
+		if (input[ipos] == ';')
 		{
-
-			if (input[ipos] == ';')
+			if (bc == num)
 			{
-				if (bc == num)
-				{
-					in[len] = '\0';
+				in[final_length] = '\0';
 
-					break;
-				}
-				else
-				{
-
-					bc++;
-					len = 0;
-				}
+				break;
 			}
 			else
 			{
-				in[len++] = input[ipos];
+
+				bc++;
+				final_length = 0;
 			}
 		}
+		else
+		{
+			in[final_length++] = input[ipos];
+		}
+	}
+*/
 
-	//for (int i = 0; i < cnt; ++i)
+	int newStartIndex = startIndex + num;
+
+	
+	//printf("\nCL[ %d ] Input args:  startIndex = %d", num, startIndex);
+
+	for (int i = 0; i < inlen ; ++i)
+	{
+		in[i] = input[i];
+		//printf("num = %d, in[%d] = %c", num, i, in[i]);
+	}
+
+	int lenStart = 0;
+
+	lenStart = myitoa(newStartIndex, tmp, 16);
+// still reverse function not working we have to redo reverse
+	unsigned char* revTemp[64] = { '\0' };
+	for (int i = 0; i < lenStart; ++i)
+	{
+		revTemp[i] = tmp[lenStart - 1 - i] ;
+
+		//printf("Output from itoa - num = %d, temp[%d] = %c", num, i, tmp[i]);
+	}
+	//for (int i = 0; i < lenStart; ++i)
 	//{
-	//	//in[i] = tmp[i];
-	//	//printf("num = %d , len = %d, in=%c", num, cnt, tmp[i]);
+	//	printf("Output from itoa - REVTemp temp[%d] = %c", i, revTemp[i]);
 	//}
+
+	final_length = inlen + lenStart;
+
 	
 
+	for (int i = inlen; i < final_length+1; ++i)
+	{
+		in[i] = revTemp[i -inlen];
+		//printf("num = %d, in[%d] = %c", num, i, in[i]);
+	}
+	in[final_length+1] = '\0';
+
+	//for (int i = 0; i < final_length; ++i)
+	//{
+	//	printf("KL [%d] newString formed :in[%d] = %c", num, i, in[i]);
+	//}
+	//printf("\nCL[ %d ] Kernel New input: newStartIndex = %d", num, newStartIndex);
+
+	
 	tmp_len = SHA224_256_BLOCK_SIZE - m_len;
-	rem_len = len < tmp_len ? len : tmp_len;
+	rem_len = final_length < tmp_len ? final_length : tmp_len;
 
 	//memcpy(&m_block[m_len], input.c_str(), rem_len);
 	for (int i = m_len; i < rem_len; ++i)
@@ -149,12 +291,12 @@ __kernel void sha256(__global char* input, int inlen, __global unsigned char* ou
 	}
 	m_block[rem_len] = '\0';
 
-	if (m_len + len < SHA224_256_BLOCK_SIZE) {
-		m_len += len;
+	if (m_len + final_length < SHA224_256_BLOCK_SIZE) {
+		m_len += final_length;
 	}
 	else
 	{
-		new_len = len - rem_len;
+		new_len = final_length - rem_len;
 
 		block_nb = new_len / SHA224_256_BLOCK_SIZE;
 		shifted_message = in + rem_len;
@@ -247,7 +389,7 @@ __kernel void sha256(__global char* input, int inlen, __global unsigned char* ou
 
 	//ctx.final(digest);
 
-	
+
 	block_nb = (1 + ((SHA224_256_BLOCK_SIZE - 9) < (m_len % SHA224_256_BLOCK_SIZE)));
 	len_b = (m_tot_len + m_len) << 3;
 	pm_len = block_nb << 6;
@@ -305,17 +447,66 @@ __kernel void sha256(__global char* input, int inlen, __global unsigned char* ou
 		SHA2_UNPACK32(m_h[i], &digest[i << 2]);
 	}
 
-	//unsigned char buf[2 * DIGEST_SIZE + 1];
-	//buf[2 * DIGEST_SIZE] = 0;
+	//unsigned char tempout[2 * DIGEST_SIZE + 1];
+	//tempout[2 * DIGEST_SIZE] = 0;
+
+	//
+	//for (int index = 0; index < DIGEST_SIZE; index++)
+	//{
+	//	tempout[index] = digest[index];
+	//	//printf("KL[%d]: tempout-assignemnt - index=[%d], hash : %02x",num, index, tempout[index]);
+	//}
 
 
-	for (int i = 0; i < DIGEST_SIZE; i++)
+//
+//	//printf("KL [%d]: final_len=[%d], pos [%d] hash : %c", num, final_length, final_length, out[final_length]);
+
+	outlen = (DIGEST_SIZE ) + final_length + 1;
+
+	//printf("KL [%d]: outputsize  : %d", num , outlen);
+	for (int i = 0; i < outlen && newStartIndex == 0; ++i)
 	{
-		out[num*(DIGEST_SIZE*2) + (i * 2)] = digest[i];
+		//printf("onetime initialization");
+		out[i] = '\0';
+	}
 
-		//printf(" num = %d, i = [%d], d = %02x, outloc = %d", num, i, digest[i], num*(DIGEST_SIZE * 2) + (i * 2) );
+	if (digest[0] == 0x00) {
+		if (digest[1] == 0x00)
+		{
+			if (digest[2] == 0x00)
+			{
+				//if (digest[3] == 0x00) {
+					//if (digest[4] == 0x00){
+						//printf("Kernel : NONCE evaluate before :- %x\n", newStartIndex);
+
+				for (int i = 0; i < final_length; ++i)
+				{
+					out[i] = in[i];
+					//printf("KL [%d]: index=[%d], pos [%d] hash : %c", num, i, i, out[i]);
+				}
+
+				out[final_length] = '-';
+				//
+				//	//printf("KL [%d]: final_len=[%d], pos [%d] hash : %c", num, final_length, final_length, out[final_length]);
+
+				for (int i = 0; i < DIGEST_SIZE; ++i)
+				{
+					outlen = (DIGEST_SIZE)+final_length + 1;
+					out[final_length + 1 + i] = digest[i];
+				}
+
+				//printf("Kernel : NONCE evaluate after :- %x\n", newStartIndex);
+
+			//}
+		//}
+			}
+		}
 	}
 
 
-	////
+
+
+
+
+	return;
 }
