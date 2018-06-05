@@ -1,3 +1,8 @@
+/*
+Author : Anshul Yadav
+email : yadav26@gmail.com
+LinkedIn: https://www.linkedin.com/in/anshul-yadav-2289b734/
+*/
 
 #include <CL/cl.h>
 #include <string.h>

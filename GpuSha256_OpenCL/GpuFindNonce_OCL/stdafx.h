@@ -1,7 +1,9 @@
-// stdafx.h : include file for standard system include files,
-// or project specific include files that are used frequently, but
-// are changed infrequently
-//
+/*
+Author : Anshul Yadav
+email : yadav26@gmail.com
+LinkedIn: https://www.linkedin.com/in/anshul-yadav-2289b734/
+*/
+
 
 #pragma once
 
