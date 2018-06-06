@@ -75,7 +75,7 @@ void reverse(char *str, int length)
 }
 
 // Implementation of itoa()
-int myitoa(int num, char* str, int base)
+int myitoa(unsigned long num, char* str, int base)
 {
 
 	int i = 0;
@@ -348,6 +348,7 @@ int FindHashforInputString(char* in, int inputlen, unsigned char* buf )
 			m_h[j] += wv[j];
 		}
 	}
+
 
 	///
 	for (i = 0; i < 8; i++) {
@@ -766,12 +767,13 @@ int MemCopy_GlobalInputBuffer(__global char* src, int srclen, unsigned char* dst
 
 	return srclen;
 }
-void printBuffer(char* buff, int len )
+
+void printBuffer(unsigned char* buff, int len )
 {
 	printf("\nPrinting buffer for input length = %d", len);
 
 	for (int i = 0; i < len; ++i) {
-		printf("Printing Buffer - Buff[%d] = [%02x]-[%c]", i, buff[i], buff[i]);
+		printf("Printing Buffer - Buff[%d] = [%02x]-[%c]", i, buff[i], buff[i] );
 	}
 
 	return;
@@ -779,8 +781,10 @@ void printBuffer(char* buff, int len )
 
 void printHash(unsigned char*buff)
 {
+
 	for (int i = 0; i < DIGEST_SIZE; ++i) {
-		printf("Printing HASH - Buff[%d] = [%02x]-[%c]", i, buff[i], buff[i]);
+		printf("Printing HASH - Buff[%d] = [%x][%02x]-[%c]", i, buff[i], buff[i], buff[i]);
+
 	}
 	return;
 }
@@ -792,24 +796,30 @@ void printHash(unsigned char*buff)
 //input string is used only for comparison.
 ///
 
-__kernel void sha256_nonce_for_smaller_hash(__global char* input,
-	int inlen,
-	__global unsigned char* out,
-	int outlen,
-	unsigned long startIndex,
-	__global char* targetHash
-	)
+
+
+__kernel void sha256_nonce_for_smaller_hash( 
+		__global unsigned char* input,
+		int inlen,
+		__global unsigned char* out,
+		int outlen,
+		unsigned long startIndex,
+		__global unsigned char* targetHash
+		)
 {
-	
-	unsigned char digest[DIGEST_SIZE + 1] = {0};
-	
+	bool found = false;
+
 	int num = get_global_id(0);
 
+	unsigned char digest[DIGEST_SIZE + 1] = { 0 };
+
 	unsigned long newStartIndex = startIndex + num;
-
-
-	char inbuff[512] = {'\0'};
 	
+	//if (num == 0)
+		//printf("\nStartIndex = %x\n", startIndex);
+
+	unsigned char inbuff[512] = {'\0'};
+
 	int inlength = inlen;
 
 	if (inlen > 512)
@@ -820,11 +830,10 @@ __kernel void sha256_nonce_for_smaller_hash(__global char* input,
 
 	inlength = MemCopy_GlobalInputBuffer(input, inlen, inbuff, 512);
 
-	//printBuffer(inbuff, inlength);
-	
+
 	unsigned int final_length = 0;
 
-	char tmp[64] = {0};
+	char tmp[64] = { 0 };
 	int lenStart = 0;
 
 
@@ -832,8 +841,8 @@ __kernel void sha256_nonce_for_smaller_hash(__global char* input,
 
 	lenStart = myitoa(newStartIndex, tmp, 16); // base 16
 
-	
-	// still reverse function not working we have to redo reverse
+
+// still reverse function not working we have to redo reverse
 	unsigned char revTemp[64] = { '\0' };
 
 	for (int i = 0; i < lenStart; ++i)
@@ -841,70 +850,84 @@ __kernel void sha256_nonce_for_smaller_hash(__global char* input,
 		revTemp[i] = tmp[lenStart - 1 - i];
 	}
 
-	//printBuffer(revTemp, lenStart);
+	
 	int res = FindHashforInputString(revTemp, lenStart, digest);
-
-	//printHash(digest);
+	//if(newStartIndex == 0xE993C5ABCDEFABCD)
+	//{
+	//	printBuffer(revTemp, lenStart);
+	//	printHash(digest);
+	//}
+	
 
 	//outlen = (DIGEST_SIZE)+final_length + 1;
 
 	////printf("KL [%d]: outputsize  : %d", num , outlen);
-	for (int i = 0; i < outlen+1 && newStartIndex == 0; ++i)
-	{
-		//printf("onetime initialization");
-		out[i] = '\0';
-	}
+	//for (int i = 0; i < DIGEST_SIZE*2 +1 && (newStartIndex - startIndex )== 0; ++i)
+	//{
+	//	//printf("onetime initialization");
+	//	out[i] = '\0';
+	//}
 
+	//printBuffer(inbuff, inlength);
 
 	//unsigned char tempout[2 * DIGEST_SIZE + 1];
-	bool found = false;
+
 	//tempout[2 * DIGEST_SIZE] = 0;
-	for (int index = 0; index < DIGEST_SIZE; index++)
+	for (int index = 0; index < inlength -1; index++)
 	{
-		//tempout[index] = digest[index];
-		if (targetHash[index] > digest[index])
+	
+		if (inbuff[index] > digest[index])
 		{
 			found = true;
-			//printf("KL[%x]: comparison check - t[%d] = [%02x]  > f[%02x]", newStartIndex, index, targetHash[index], digest[index]);
+			
+			//printf("KL[%x]: comparison check - t[%d] = [%02x]  > f[%02x]", newStartIndex, index, inbuff[index], digest[index]);
 			break;
 		}
-		else if (targetHash[index] < digest[index]) {
+		else if (inbuff[index] < digest[index]) {
 			found = false;
-			//printf("KL[%x]: comparison check- t[%d] = [%02x]  < f[%02x]", newStartIndex, index, targetHash[index], digest[index]);
+			//printf("KL[%x]: comparison check- t[%d] = [%02x]  < f[%02x]", newStartIndex, index, inbuff[index], digest[index]);
 			break;
 		}
 		else {
-			//printf("KL[%d]: comparison check- t[%d] = [%02x] = f[%02x]", newStartIndex, index, targetHash[index], digest[index]);
-		}
 			
+			//printf("KL[%d]: comparison check EQUALITY- t[%d] = [%02x] = f[%02x]", newStartIndex, index, inbuff[index], digest[index]);
+		}
 	
 	}
 
 
 	//printf("KL[%d]: comparison check- Result Found [%d]", num, found);
 	//
+	//barrier(CLK_GLOBAL_MEM_FENCE);
+
 	if (found)
 	{
-		//printHash(targetHash);
+		//printHash(inbuff);
 		//printHash(digest);
-		printf("Found smaller then target hash , now filling outbuffer; nonce (newStartIndex) =  %x", newStartIndex);
+
+		//if (out[0] != '\0')
+		//	return;
+		//out[0] = 1;
+
+		printf("Found out[0]=null writing one time. nonce (newStartIndex) =  %x, lenStart = %d", newStartIndex, lenStart);
+		
 		for (int i = 0; i < lenStart; ++i)
 		{
 			out[i] = revTemp[i];
 			//printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, i, out[i], out[i]);
 		}
 
-		unsigned char t = '-';
-		out[lenStart] = t;
-		//
-		//printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, lenStart, out[i], out[i]);
+		
+		out[lenStart] = '-';
+		
+		//printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, lenStart, out[lenStart], out[lenStart]);
 
-		lenStart+=1;
+		lenStart += 1;
 		for (int i = lenStart; i < DIGEST_SIZE + lenStart ; ++i)
 		{
 			out[i] = digest[i - lenStart];
 			
-			//printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, i, out[i], out[i]);
+			//printf("KL [%d]: out_hex[%d] = %02x", num, i, out[i]);
 		}
 
 	}

@@ -13,8 +13,8 @@ const char* kernel_name_nonce = "sha256_nonce";
 const char* kernel_name = "sha256_nonce_for_smaller_hash";
 
 string shello = "hello0";
-UINT64 start = 0;
-
+UINT64 start = 0;// 0x665782;
+UINT64 GPUTHREADS = 100000;
 
 
 //////// 
@@ -37,47 +37,36 @@ bool findsmallerhash(string str1, string str2) {
 	return false;
 }
 
+void convertHash64tobyte32(string s, unsigned char* d)
+{
+
+	int pos = 0, i = 0;
+
+	while (pos < 64)
+	{
+		string t = s.substr(pos, 2);
+
+		pos += 2;
+		int it = std::stoi(t, nullptr, 16);
+		d[i++] = (unsigned char)it;
+
+		//cout << t << " = "<< hex << d[i]<< dec << " \n";
+		//printf("i=%d str=%s, d = %02x, %c \n", i, t.c_str(), d[i], d[i]);
+		//++i;
+	}
+}
 
 int main(int argc, char* argv[])
 {
-	string Target = "0000000399C6AEA5AD0C709A9BC331A3ED6494702BD1D129D8C817A0257A1462"; //665782;
+	string Target1 = "0010000399c6aea5ad0c709a9bc331a3ed6494702bd1d129d8c817a0257a1462"; //665782
+//	string Target1 = "00000002234205614eaaa251bc8bc3aa635a9684c489f68609bacb71b11bf3fc"; //3627efee
+	int pos = 0, i = 0;
+	unsigned char input[33] = { '\0' };
 
-	//char TargetInBytes[] = { 0x12, 0x00, 0x00,0x00, 0x00,0x00, 0x03,0x00, 0x99,0x00, 0xC6,0x00, 0xAE,
-	//	0x00, 0xA5,0x00, 0xAD,0x00, 0x0C,0x00, 0x70,0x00, 0x9A,0x00, 0x9B,0x00, 0xC3,0x00, 0x31,0x00, 0xA3,
-	//	0x00, 0xED,0x00, 0x64,0x00, 0x94,0x00, 0x70,0x00, 0x2B,0x00, 0xD1,0x00, 0xD1,0x00, 0x29,0x00, 0xD8,
-	//	0x00, 0xC8,0x00, 0x17,0x00, 0xA0,0x00, 0x25,0x00, 0x7A,0x00, 0x14,0x00, 0x62, 0x00, }; //665782
-
-	//int targetlen = sizeof(TargetInBytes)/sizeof(char);
-
-	//int r = 0;
-	//
-	//while (r < targetlen) //TargetInBytes;//"0000000399C6AEA5AD0C709A9BC331A3ED6494702BD1D129D8C817A0257A1462"; //665782
-	//{
-	////	int x = TargetInBytes[r] | TargetInBytes[r+1] << 1 | TargetInBytes[r + 2] << 2 | TargetInBytes[r + 3] << 3;
-
-	//	char t[4] = { '\0' };
-	//	sprintf(t, "%x", TargetInBytes[r]);
-	//	Target.append(t);
-	//	r ++;
-	//}
-	//	
-	int p = -1;
-
-	Target[0] = 0x00;
-	Target[1] = 0x00;
-	Target[2] = 0x00;
-	//Target[3] = 0x00;
-	//Target[4] = 0x00;
-	//Target[5] = 0x00;
-	//Target[6] = 0x00;
-	//Target[7] = 0x00;
-	//Target[8] = 0x00;
-
-	
-	//while (++p < Target.length())
-	//{
-	//	printf("p %d =[%c] [%02x] \n", p, Target[p], Target[p]);
-	//}
+	convertHash64tobyte32(Target1, input);
+		
+	for (int i = 0; i<32; ++i)
+		printf("%02x", input[i]);
 
 	int outputSize = sizeof(char) * (shello.length() * HASH_LENGTH  * 2 );
 
@@ -97,10 +86,10 @@ int main(int argc, char* argv[])
 
 	long int tsNonce = GetTickCount();
 	string nonce;
-	string  newstr=shello;
+	//string  newstr=Target;
 
 	
-	cl_int	status = InitializeOCL(&g_oclInstance, filename, newstr.c_str(), output);
+	cl_int	status = InitializeOCL(&g_oclInstance, filename, input, output);
 	if (status != 0)
 	{
 		return 0;
@@ -118,16 +107,16 @@ int main(int argc, char* argv[])
 
 
 	bool bIsSmaller = false;
-
+	
 	while(MapNonce.size() < 1 )
 	//while(start < start+ 4*GPUTHREADS)
 	{
-
-
-		int inlength = newstr.length();
+		int inlength = sizeof(input)/sizeof(unsigned char);
+	
 		memset(output, '\0', outputSize);
+		
 		//int ts = GetTickCount();
-		status = RunGpu_Loads(&g_oclInstance, newstr.c_str(), (char*)output, kernel_name, start, outputSize, Target );
+		status = RunGpu_Loads(GPUTHREADS, &g_oclInstance, input, inlength ,(char*)output, kernel_name, start, outputSize, Target1 );
 
 		//int te = GetTickCount();
 
@@ -137,8 +126,9 @@ int main(int argc, char* argv[])
 
 		start += GPUTHREADS;
 
-		for (int k = 0; k < GPUTHREADS; k++)
+		for (int k = 0; k < GPUTHREADS && MapNonce.size() < 1; k++)
 		{
+
 			int outlen = -1;
 			if (output[0] == '\0')
 				continue;
@@ -181,8 +171,6 @@ int main(int argc, char* argv[])
 
 			//hashCollection.push_back(tmp);
 			
-			
-
 			//if(MapNonce.size() > 0 )
 			// bIsSmaller = findsmallerhash( Target ,mapit->first);
 			 //if (bIsSmaller == true)
@@ -199,13 +187,20 @@ int main(int argc, char* argv[])
 
 	long int teNonce = GetTickCount();
 
-	cout << "\n Input String = " << shello << endl;
-	cout << "\n Input Target Hash = " << Target << endl;
+//	cout << "\n Input String = " << shello << endl;
+	cout << "\n Input Target Hash = " << Target1 << endl;
 	
 	mapit = MapNonce.begin();
 
-	int i_hex = std::stoi((mapit->second).c_str(), nullptr, 16);
-	cout << "\n Nonce = 0x " <<hex<< i_hex << endl;
+	try {
+		UINT64 i_hex = std::stoi((mapit->second).c_str(), nullptr, 16);
+		cout << "\n Nonce = " << hex << i_hex << endl;
+	}
+	catch (exception e)
+	{
+		cout << "\n Nonce = INVALID INPUT"<< endl;
+	}
+	
 	
 	cout << "\n HASH =  " << mapit->first.c_str() << endl << dec ;
 	cout << "\n Nonce found in  time = " << teNonce - tsNonce << endl;

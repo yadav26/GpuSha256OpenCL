@@ -7,7 +7,7 @@ LinkedIn: https://www.linkedin.com/in/anshul-yadav-2289b734/
 #include "CLHashHeader.h"
 
 extern OCL_INSTANCE g_oclInstance;
-
+extern const unsigned long int GPUTHREADS ;
 
 BOOL WINAPI consoleHandler(DWORD signal) {
 
@@ -61,14 +61,14 @@ cl_int ReleaseOCL(OCL_INSTANCE* pOcl)
 	cl_int status = clReleaseKernel(pOcl->kernel);		//Release kernel.
 	status = clReleaseProgram(pOcl->program);			//Release the program object.
 	status = clReleaseMemObject(pOcl->inputBuffer);		//Release mem object.
-	status = clReleaseMemObject(pOcl->inputTargetBuffer);		//Release mem object.
+	status = clReleaseMemObject(pOcl->outputNonceBuffer);		//Release mem object.
 	status = clReleaseMemObject(pOcl->outputBuffer);
 	status = clReleaseCommandQueue(pOcl->commandQueue);	//Release  Command queue.
 	status = clReleaseContext(pOcl->context);			//Release context.
 
 	pOcl->inputBuffer = NULL;
 	pOcl->outputBuffer = NULL;
-	pOcl->inputTargetBuffer = NULL;
+	pOcl->outputNonceBuffer = NULL;
 
 	if (pOcl->devices != NULL)
 	{
@@ -83,7 +83,7 @@ cl_int ReleaseOCL(OCL_INSTANCE* pOcl)
 
 cl_int InitializeOCL(OCL_INSTANCE *pOcl,
 	const char *filename,
-	const char* input,
+	unsigned char* input,
 	unsigned char* output)
 {
 
@@ -167,8 +167,9 @@ cl_int InitializeOCL(OCL_INSTANCE *pOcl,
 	return status;
 }
 
-cl_int RunGpu_Loads(POCL_INSTANCE pOcl,
-	const char* input,
+cl_int RunGpu_Loads( UINT64 gpuThreads, POCL_INSTANCE pOcl,
+	unsigned char* input,
+	cl_uint inputSize,
 	char* output,
 	const char* kernel_name,
 	cl_ulong startIndex,
@@ -176,31 +177,32 @@ cl_int RunGpu_Loads(POCL_INSTANCE pOcl,
 	string targetHash)
 {
 
-	size_t inStrlength = strlen(input);
+	size_t inStrlength = inputSize;//strlen(input);
 	//cout << "input string : [" << input << "]" << endl;
-	int outputlength = HASH_LENGTH * GPUTHREADS;
+	int outputlength = HASH_LENGTH * gpuThreads;
 	//	size_t outputSize = outputSize; //outputlength * sizeof(char);
 
+
 	pOcl->inputBuffer = clCreateBuffer(pOcl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, (inStrlength + 1) * sizeof(char), (void *)input, NULL);
-	pOcl->inputTargetBuffer = clCreateBuffer(pOcl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, targetHash.size() * sizeof(char), (void *)targetHash.c_str(), NULL);
+	pOcl->outputNonceBuffer = clCreateBuffer(pOcl->context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, targetHash.size() * sizeof(char), (void *)targetHash.c_str(), NULL);
 	pOcl->outputBuffer = clCreateBuffer(pOcl->context, CL_MEM_WRITE_ONLY, outputSize, NULL, NULL);
 
 	/*Step 8: Create kernel object */
 	pOcl->kernel = clCreateKernel(pOcl->program, kernel_name, NULL);
 
 	cl_int outStringlen = -1;
-	char* target = (char*)targetHash.c_str();
+	//char* target = (char*)targetHash;//
 	/*Step 9: Sets Kernel arguments.*/
 	cl_int status = clSetKernelArg(pOcl->kernel, 0, sizeof(cl_mem), (void *)&pOcl->inputBuffer);
 	status = clSetKernelArg(pOcl->kernel, 1, sizeof(cl_int), (void *)&inStrlength);
 	status = clSetKernelArg(pOcl->kernel, 2, sizeof(cl_mem), (void *)&pOcl->outputBuffer);
 	status = clSetKernelArg(pOcl->kernel, 3, sizeof(cl_int), (void *)&outStringlen);
 	status = clSetKernelArg(pOcl->kernel, 4, sizeof(cl_ulong), (void *)&startIndex);
-	status = clSetKernelArg(pOcl->kernel, 5, sizeof(cl_mem), (void *)&pOcl->inputTargetBuffer);
+	status = clSetKernelArg(pOcl->kernel, 5, sizeof(cl_mem), (void *)&pOcl->outputNonceBuffer);
 
 
 	/*Step 10: Running the kernel.*/
-	size_t global_work_size[1] = { GPUTHREADS };
+	size_t global_work_size[1] = { gpuThreads };
 	status = clEnqueueNDRangeKernel(pOcl->commandQueue, pOcl->kernel, 1, NULL, global_work_size, NULL, 0, NULL, NULL);
 
 	/*Step 11: Read the cout put back to host memory.*/
