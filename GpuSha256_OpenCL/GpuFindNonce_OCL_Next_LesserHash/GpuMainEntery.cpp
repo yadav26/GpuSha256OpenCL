@@ -14,7 +14,7 @@ const char* kernel_name_nonce = "sha256_nonce";
 const char* kernel_name = "sha256_nonce_for_smaller_hash";
 
 string shello = "hello0";
-UINT64 start = 0;// 0x665782;
+UINT64 start = 0x1c11d982d;// 0x14ba88787;//0x8588fdb4;// 0x665782;
 UINT64 GPUTHREADS = 100000;
 
 
@@ -60,7 +60,11 @@ void convertHash64tobyte32(string s, unsigned char* d)
 int main(int argc, char* argv[])
 {
 	//string Target1 = "0000000399c6aea5ad0c709a9bc331a3ed6494702bd1d129d8c817a0257a1462"; //665782
-	string Target1 = "00000002234205614eaaa251bc8bc3aa635a9684c489f68609bacb71b11bf3fc"; //3627efee
+	//string Target1 = "00000002234205614eaaa251bc8bc3aa635a9684c489f68609bacb71b11bf3fc"; //3627efee
+	//string Target1 = "000000017d7ad95cd582ce7ccd8e73b13bec114d07f344517bfa78d9a61907fd"; //8588fdb4
+	//string Target1 = "00000000f3b400f5c7a95d62e411a1419fe63826acd5385d3a40a22d353980d4"; //14ba88787
+	string Target1 = "000000001a84fe93cf3e0bc70b1915bcb26c5125b6f7a9e95874e654c843493d"; //14ba88787
+
 	int pos = 0, i = 0;
 	unsigned char input[33] = { '\0' };
 
@@ -171,8 +175,8 @@ int main(int argc, char* argv[])
 	mapit = MapNonce.begin();
 
 	try {
-		UINT64 i_hex = std::stoi((mapit->second).c_str(), nullptr, 16);
-		cout << "\n Nonce = " << hex << i_hex << endl;
+		//UINT64 i_hex = std::stoi((mapit->second).c_str(), nullptr, 16);
+		cout << "\n Nonce = " << (mapit->second).c_str() << endl;
 	}
 	catch (exception e)
 	{
