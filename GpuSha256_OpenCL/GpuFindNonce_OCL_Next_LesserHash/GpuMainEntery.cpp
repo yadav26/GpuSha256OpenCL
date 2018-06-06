@@ -7,6 +7,7 @@ LinkedIn: https://www.linkedin.com/in/anshul-yadav-2289b734/
 
 #include "CLHashHeader.h"
 
+#include "CpuSHA256.h"
 
 const char *filename = "GpuFindNonce_OCL_Next_LesserHash.cl.cpp";
 const char* kernel_name_nonce = "sha256_nonce";
@@ -58,8 +59,8 @@ void convertHash64tobyte32(string s, unsigned char* d)
 
 int main(int argc, char* argv[])
 {
-	string Target1 = "0010000399c6aea5ad0c709a9bc331a3ed6494702bd1d129d8c817a0257a1462"; //665782
-//	string Target1 = "00000002234205614eaaa251bc8bc3aa635a9684c489f68609bacb71b11bf3fc"; //3627efee
+	//string Target1 = "0000000399c6aea5ad0c709a9bc331a3ed6494702bd1d129d8c817a0257a1462"; //665782
+	string Target1 = "00000002234205614eaaa251bc8bc3aa635a9684c489f68609bacb71b11bf3fc"; //3627efee
 	int pos = 0, i = 0;
 	unsigned char input[33] = { '\0' };
 
@@ -94,9 +95,6 @@ int main(int argc, char* argv[])
 	{
 		return 0;
 	}
-	//newstr.clear();
-
-	//vStrings.clear();
 
 	char buff[65] = { '\0' };
 	std::pair <string, string> kvp;
@@ -134,47 +132,27 @@ int main(int argc, char* argv[])
 				continue;
 
 			unsigned char* travStart = output;
-			string noncestr;
-			char bftochar[2];
-			while (travStart[++outlen] -! '-' )
+			string strOut = (char*)output;
+			int cpos = 0; // strOut.find_first_of(',');
+			
+			while (cpos != -1)
 			{
-				if (travStart[outlen] == '-')
-					break;
-				sprintf(bftochar, "%c", travStart[outlen]);
-				noncestr.append(string( bftochar));
+				cpos = strOut.find_first_of(',');
+				string t = strOut.substr(0, cpos); 
+				strOut = strOut.substr(cpos+1, strOut.length());
 
-				//cout << travStart[outlen] << " " ;
+				if (t == "")
+					continue;
+				//pos = cpos;
+				hashCollection.push_back(t);
 
 			}
-		
-			travStart = &travStart[outlen +1];
+			for (auto&&x : hashCollection)
+			{
+				string hash = sha256(x);
+				MapNonce.insert(pair <string, string>( hash, x ));
+			}
 
-			sprintf(buff, "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-				travStart[0], travStart[1], travStart[2], travStart[3], travStart[4],
-				travStart[5], travStart[6], travStart[7], travStart[8], travStart[9],
-				travStart[10], travStart[11], travStart[12], travStart[13], travStart[14],
-				travStart[15], travStart[16], travStart[17], travStart[18], travStart[19],
-				travStart[20], travStart[21], travStart[22], travStart[23], travStart[24],
-				travStart[25], travStart[26], travStart[27], travStart[28], travStart[29],
-				travStart[30], travStart[31]
-			);
-
-			travStart[32] = '\0';
-
-			string tmp = buff;
-
-			//cout << tmp << endl;
-			
-			//noncestr = noncestr.substr(5, noncestr.size() );
-			
-			MapNonce.insert(pair <string, string>(tmp, noncestr));
-
-			//hashCollection.push_back(tmp);
-			
-			//if(MapNonce.size() > 0 )
-			// bIsSmaller = findsmallerhash( Target ,mapit->first);
-			 //if (bIsSmaller == true)
-			//	 break;
 
 			memset(output, '\0', outputSize );
 

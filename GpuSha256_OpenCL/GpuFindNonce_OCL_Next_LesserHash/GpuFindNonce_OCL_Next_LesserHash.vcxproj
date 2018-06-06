@@ -159,11 +159,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CLHashHeader.h" />
+    <ClInclude Include="CpuSHA256.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CLHashHeader.cpp" />
+    <ClCompile Include="CpuSHA256.cpp" />
     <ClCompile Include="GpuMainEntery.cpp" />
     <None Include="GpuFindNonce_OCL_Next_LesserHash.cl.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>

@@ -852,11 +852,6 @@ __kernel void sha256_nonce_for_smaller_hash(
 
 	
 	int res = FindHashforInputString(revTemp, lenStart, digest);
-	//if(newStartIndex == 0xE993C5ABCDEFABCD)
-	//{
-	//	printBuffer(revTemp, lenStart);
-	//	printHash(digest);
-	//}
 	
 
 	//outlen = (DIGEST_SIZE)+final_length + 1;
@@ -868,11 +863,6 @@ __kernel void sha256_nonce_for_smaller_hash(
 	//	out[i] = '\0';
 	//}
 
-	//printBuffer(inbuff, inlength);
-
-	//unsigned char tempout[2 * DIGEST_SIZE + 1];
-
-	//tempout[2 * DIGEST_SIZE] = 0;
 	for (int index = 0; index < inlength -1; index++)
 	{
 	
@@ -908,27 +898,29 @@ __kernel void sha256_nonce_for_smaller_hash(
 		//if (out[0] != '\0')
 		//	return;
 		//out[0] = 1;
-
 		printf("Found out[0]=null writing one time. nonce (newStartIndex) =  %x, lenStart = %d", newStartIndex, lenStart);
-		
-		for (int i = 0; i < lenStart; ++i)
+		int len = 0;
+		while (out[len] != '\0') ++len;
+		out[len] = ',';
+		len += 1;
+		for (int i = len; i < len+lenStart; ++i)
 		{
-			out[i] = revTemp[i];
+			out[i] = revTemp[i-len];
 			//printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, i, out[i], out[i]);
 		}
 
 		
-		out[lenStart] = '-';
-		
-		//printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, lenStart, out[lenStart], out[lenStart]);
+		//out[lenStart] = '-';
+		//
+		////printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, lenStart, out[lenStart], out[lenStart]);
 
-		lenStart += 1;
-		for (int i = lenStart; i < DIGEST_SIZE + lenStart ; ++i)
-		{
-			out[i] = digest[i - lenStart];
-			
-			//printf("KL [%d]: out_hex[%d] = %02x", num, i, out[i]);
-		}
+		//lenStart += 1;
+		//for (int i = lenStart; i < DIGEST_SIZE + lenStart ; ++i)
+		//{
+		//	out[i] = digest[i - lenStart];
+		//	
+		//	//printf("KL [%d]: out_hex[%d] = %02x", num, i, out[i]);
+		//}
 
 	}
 
