@@ -157,7 +157,7 @@ int FindHashforInputString(char* in, int inputlen, unsigned char* buf )
 	unsigned char m_block[128];
 	char *shifted_message;
 
-	int gsha256_k[64] = //UL = uint32
+	int gsha256_k[64] = //UL = unsigned int
 	{ 0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
 		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
 		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
@@ -369,388 +369,6 @@ int FindHashforInputString(char* in, int inputlen, unsigned char* buf )
 
 //Block size on Bit chain is 1 MB
 //inlen == sizeof(char) * 1000 * 1000 == 1 MegaBytes
-/*
-
-__kernel void sha256_nonce( __global char* input, 
-							int inlen, 
-							__global unsigned char* out,  
-							int outlen,
-							unsigned long startIndex )
-{
-	
-
-	
-
-	unsigned int m_len = 0;
-	unsigned int m_tot_len = 0;
-
-	unsigned int pm_len;
-	unsigned int len_b;
-	unsigned int block_nb;
-	unsigned int new_len, rem_len, tmp_len;
-
-	unsigned int final_length = 0;
-	uint w[64];
-	uint wv[8];
-	uint t1, t2;
-	int i;
-	int j;
-
-	unsigned char *message;
-	unsigned char *sub_block;
-	unsigned char digest[DIGEST_SIZE] = { 0 };
-	unsigned char m_block[128];
-	char *shifted_message;
-	char* in[512] = { '\0' };
-
-	int num = get_global_id(0);
-
-	int gsha256_k[64] = //UL = uint32
-	{ 0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
-		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-		0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-		0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
-		0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-		0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-		0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-		0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-		0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-		0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
-		0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-		0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
-		0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-		0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2 };
-
-
-	uint m_h[8] = { 0 };
-	m_h[0] = 0x6a09e667;
-	m_h[1] = 0xbb67ae85;
-	m_h[2] = 0x3c6ef372;
-	m_h[3] = 0xa54ff53a;
-	m_h[4] = 0x510e527f;
-	m_h[5] = 0x9b05688c;
-	m_h[6] = 0x1f83d9ab;
-	m_h[7] = 0x5be0cd19;
-
-	//printf("\nCL Kernel Input args : inLen = %d\n", inlen);
-
-	//Assign local array -- Should be removed for optimization
-	//unsigned int incount = -1;
-	//unsigned int breakcounter = 0;
-
-	int ipos = -1;
-	int bc = 0;
-	int lpos = 0;
-	int cnt = 0;
-	char tmp[64] ;
-
-	//while (input[++ipos] != '\0')
-	//{
-
-	//	if (input[ipos] == ';')
-	//	{
-	//		if (bc == num)
-	//		{
-	//			in[final_length] = '\0';
-
-	//			break;
-	//		}
-	//		else
-	//		{
-
-	//			bc++;
-	//			final_length = 0;
-	//		}
-	//	}
-	//	else
-	//	{
-	//		in[final_length++] = input[ipos];
-	//	}
-	//}
-
-
-	int newStartIndex = startIndex + num;
-
-	
-	//printf("\nCL[ %d ] Input args:  startIndex = %d", num, startIndex);
-
-	for (int i = 0; i < inlen ; ++i)
-	{
-		in[i] = input[i];
-		//printf("num = %d, in[%d] = %c", num, i, in[i]);
-	}
-
-	int lenStart = 0;
-
-	lenStart = myitoa(newStartIndex, tmp, 16);
-// still reverse function not working we have to redo reverse
-	unsigned char* revTemp[64] = { '\0' };
-	for (int i = 0; i < lenStart; ++i)
-	{
-		revTemp[i] = tmp[lenStart - 1 - i] ;
-
-		//printf("Output from itoa - num = %d, temp[%d] = %c", num, i, tmp[i]);
-	}
-	//for (int i = 0; i < lenStart; ++i)
-	//{
-	//	printf("Output from itoa - REVTemp temp[%d] = %c", i, revTemp[i]);
-	//}
-
-	final_length = inlen + lenStart;
-
-	
-
-	for (int i = inlen; i < final_length+1; ++i)
-	{
-		in[i] = revTemp[i -inlen];
-		//printf("num = %d, in[%d] = %c", num, i, in[i]);
-	}
-	in[final_length+1] = '\0';
-
-	//for (int i = 0; i < final_length; ++i)
-	//{
-	//	printf("KL [%d] newString formed :in[%d] = %c", num, i, in[i]);
-	//}
-	//printf("\nCL[ %d ] Kernel New input: newStartIndex = %d", num, newStartIndex);
-
-	
-	tmp_len = SHA224_256_BLOCK_SIZE - m_len;
-	rem_len = final_length < tmp_len ? final_length : tmp_len;
-
-	//memcpy(&m_block[m_len], input.c_str(), rem_len);
-	for (int i = m_len; i < rem_len; ++i)
-	{
-		m_block[i] = in[i];
-	}
-	m_block[rem_len] = '\0';
-
-	if (m_len + final_length < SHA224_256_BLOCK_SIZE) {
-		m_len += final_length;
-	}
-	else
-	{
-		new_len = final_length - rem_len;
-
-		block_nb = new_len / SHA224_256_BLOCK_SIZE;
-		shifted_message = in + rem_len;
-
-		//
-		//transform(m_block, 1);
-		//transform(const unsigned char *message, unsigned int block_nb)
-		block_nb = 1;
-		message = m_block;
-
-		for (i = 0; i < (int)block_nb; i++) {
-			sub_block = message + (i << 6);
-			for (j = 0; j < 16; j++) {
-				SHA2_PACK32(&sub_block[j << 2], &w[j]);
-
-			}
-			for (j = 16; j < 64; j++) {
-				w[j] = SHA256_F4(w[j - 2]) + w[j - 7] + SHA256_F3(w[j - 15]) + w[j - 16];
-			}
-			for (j = 0; j < 8; j++) {
-				wv[j] = m_h[j];
-			}
-			for (j = 0; j < 64; j++) {
-				t1 = wv[7] + SHA256_F2(wv[4]) + SHA2_CH(wv[4], wv[5], wv[6]) + gsha256_k[j] + w[j];
-				t2 = SHA256_F1(wv[0]) + SHA2_MAJ(wv[0], wv[1], wv[2]);
-				wv[7] = wv[6];
-				wv[6] = wv[5];
-				wv[5] = wv[4];
-				wv[4] = wv[3] + t1;
-				wv[3] = wv[2];
-				wv[2] = wv[1];
-				wv[1] = wv[0];
-				wv[0] = t1 + t2;
-			}
-			for (j = 0; j < 8; j++) {
-				m_h[j] += wv[j];
-			}
-		}
-
-		//
-		//transform(shifted_message, block_nb);
-		message = (unsigned char*)shifted_message;
-
-		for (i = 0; i < (int)block_nb; i++) {
-			sub_block = message + (i << 6);
-			for (j = 0; j < 16; j++) {
-				SHA2_PACK32(&sub_block[j << 2], &w[j]);
-			}
-			for (j = 16; j < 64; j++) {
-				w[j] = SHA256_F4(w[j - 2]) + w[j - 7] + SHA256_F3(w[j - 15]) + w[j - 16];
-			}
-			for (j = 0; j < 8; j++) {
-				wv[j] = m_h[j];
-			}
-			for (j = 0; j < 64; j++) {
-				t1 = wv[7] + SHA256_F2(wv[4]) + SHA2_CH(wv[4], wv[5], wv[6]) + gsha256_k[j] + w[j];
-				t2 = SHA256_F1(wv[0]) + SHA2_MAJ(wv[0], wv[1], wv[2]);
-				wv[7] = wv[6];
-				wv[6] = wv[5];
-				wv[5] = wv[4];
-				wv[4] = wv[3] + t1;
-				wv[3] = wv[2];
-				wv[2] = wv[1];
-				wv[1] = wv[0];
-				wv[0] = t1 + t2;
-			}
-			for (j = 0; j < 8; j++) {
-				m_h[j] += wv[j];
-			}
-		}
-
-
-
-		rem_len = new_len % SHA224_256_BLOCK_SIZE;
-		//memcpy(m_block, &shifted_message[block_nb << 6], rem_len);
-		char* p = &shifted_message[block_nb << 6];
-		for (int i = 0; i < rem_len; ++i)
-		{
-
-			m_block[i] = p[i];
-			//printf("%c", m_block[i]);
-		}
-		m_block[rem_len] = '\0';
-
-		m_len = rem_len;
-		m_tot_len += (block_nb + 1) << 6;
-
-	}
-
-
-	//ctx.final(digest);
-
-
-	block_nb = (1 + ((SHA224_256_BLOCK_SIZE - 9) < (m_len % SHA224_256_BLOCK_SIZE)));
-	len_b = (m_tot_len + m_len) << 3;
-	pm_len = block_nb << 6;
-
-	//TBD
-	//memset(, 0, pm_len - m_len);
-	char* p = m_block + m_len;
-	for (int i = 0; i < pm_len - m_len; ++i)
-	{
-
-		p[i] = 0;
-	}
-	p[pm_len - m_len] = '\0';
-
-	m_block[m_len] = 0x80;
-
-	SHA2_UNPACK32(len_b, m_block + pm_len - 4);
-
-
-	///
-	//
-	//transform(m_block, block_nb);
-	message = m_block;
-
-	for (i = 0; i < (int)block_nb; i++) {
-		sub_block = message + (i << 6);
-		for (j = 0; j < 16; j++) {
-			SHA2_PACK32(&sub_block[j << 2], &w[j]);
-		}
-		for (j = 16; j < 64; j++) {
-			w[j] = SHA256_F4(w[j - 2]) + w[j - 7] + SHA256_F3(w[j - 15]) + w[j - 16];
-		}
-		for (j = 0; j < 8; j++) {
-			wv[j] = m_h[j];
-		}
-		for (j = 0; j < 64; j++) {
-			t1 = wv[7] + SHA256_F2(wv[4]) + SHA2_CH(wv[4], wv[5], wv[6]) + gsha256_k[j] + w[j];
-			t2 = SHA256_F1(wv[0]) + SHA2_MAJ(wv[0], wv[1], wv[2]);
-			wv[7] = wv[6];
-			wv[6] = wv[5];
-			wv[5] = wv[4];
-			wv[4] = wv[3] + t1;
-			wv[3] = wv[2];
-			wv[2] = wv[1];
-			wv[1] = wv[0];
-			wv[0] = t1 + t2;
-		}
-		for (j = 0; j < 8; j++) {
-			m_h[j] += wv[j];
-		}
-	}
-
-	///
-	for (i = 0; i < 8; i++) {
-		SHA2_UNPACK32(m_h[i], &digest[i << 2]);
-	}
-
-	//unsigned char tempout[2 * DIGEST_SIZE + 1];
-	//tempout[2 * DIGEST_SIZE] = 0;
-
-	//
-	//for (int index = 0; index < DIGEST_SIZE; index++)
-	//{
-	//	tempout[index] = digest[index];
-	//	//printf("KL[%d]: tempout-assignemnt - index=[%d], hash : %02x",num, index, tempout[index]);
-	//}
-
-
-//
-//	//printf("KL [%d]: final_len=[%d], pos [%d] hash : %c", num, final_length, final_length, out[final_length]);
-
-	outlen = (DIGEST_SIZE ) + final_length + 1;
-
-	//printf("KL [%d]: outputsize  : %d", num , outlen);
-	for (int i = 0; i < outlen && newStartIndex == 0; ++i)
-	{
-		//printf("onetime initialization");
-		out[i] = '\0';
-	}
-
-	if (digest[0] == 0x00) {
-		if (digest[1] == 0x00)
-		{
-			if (digest[2] == 0x00)
-			{
-				//if (digest[3] == 0x00) {
-					//if (digest[4] == 0x00){
-						//printf("Kernel : NONCE evaluate before :- %x\n", newStartIndex);
-
-				for (int i = 0; i < final_length; ++i)
-				{
-					out[i] = in[i];
-					//printf("KL [%d]: index=[%d], pos [%d] hash : %c", num, i, i, out[i]);
-				}
-
-				out[final_length] = '-';
-				//
-				//	//printf("KL [%d]: final_len=[%d], pos [%d] hash : %c", num, final_length, final_length, out[final_length]);
-
-				for (int i = 0; i < DIGEST_SIZE; ++i)
-				{
-					outlen = (DIGEST_SIZE)+final_length + 1;
-					out[final_length + 1 + i] = digest[i];
-				}
-
-				//printf("Kernel : NONCE evaluate after :- %x\n", newStartIndex);
-
-			//}
-		//}
-			}
-		}
-	}
-
-
-
-
-
-
-	return;
-}
-
-*/
-
-
-//Block size on Bit chain is 1 MB
-//inlen == sizeof(char) * 1000 * 1000 == 1 MegaBytes
 
 int MemCopy_GlobalInputBuffer(__global char* src, int srclen, unsigned char* dst, int dstlen )
 {
@@ -789,6 +407,22 @@ void printHash(unsigned char*buff)
 	return;
 }
 
+void memcpy_ocl(unsigned char* src, unsigned char* dest, unsigned int len)
+{
+	for (int i = 0; i < len+1; ++i)
+		dest[i] = src[i];
+
+	//dest[len + 1] = 0;
+}
+
+void memzero_ocl(unsigned char* dest, unsigned int len)
+{
+	for (int i = 0; i < len + 1; ++i)
+		dest[i] = 0;
+
+	//dest[len + 1] = 0;
+}
+
 
 ///
 //To find hash that is smaller then target hash; we dont need to concatenate with any input; we only need to find a numericalstring
@@ -798,14 +432,177 @@ void printHash(unsigned char*buff)
 
 
 
-__kernel void sha256_nonce_for_smaller_hash( 
-		__global unsigned char* input,
-		int inlen,
-		__global unsigned char* out,
-		int outlen,
-		unsigned long startIndex,
-		__global unsigned char* targetHash
-		)
+void transform(unsigned char *message, unsigned int block_nb, unsigned int* m_h)
+{
+	unsigned int sha256_k[64] = 
+	{ 0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
+		0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+		0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+		0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+		0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
+		0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+		0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
+		0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+		0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+		0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+		0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
+		0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+		0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
+		0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+		0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+		0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2 };
+
+	unsigned int w[64];
+	unsigned int wv[8];
+	unsigned int t1, t2;
+	unsigned char *sub_block;
+	int i;
+	int j;
+	for (i = 0; i < (int)block_nb; i++) 
+	{
+		sub_block = message + (i << 6);
+		for (j = 0; j < 16; j++) {
+			SHA2_PACK32(&sub_block[j << 2], &w[j]);
+		}
+		for (j = 16; j < 64; j++) {
+			w[j] = SHA256_F4(w[j - 2]) + w[j - 7] + SHA256_F3(w[j - 15]) + w[j - 16];
+		}
+		for (j = 0; j < 8; j++) {
+			wv[j] = m_h[j];
+		}
+		for (j = 0; j < 64; j++) {
+			t1 = wv[7] + SHA256_F2(wv[4]) + SHA2_CH(wv[4], wv[5], wv[6]) + sha256_k[j] + w[j];
+			t2 = SHA256_F1(wv[0]) + SHA2_MAJ(wv[0], wv[1], wv[2]);
+			wv[7] = wv[6];
+			wv[6] = wv[5];
+			wv[5] = wv[4];
+			wv[4] = wv[3] + t1;
+			wv[3] = wv[2];
+			wv[2] = wv[1];
+			wv[1] = wv[0];
+			wv[0] = t1 + t2;
+		}
+		for (j = 0; j < 8; j++) {
+			m_h[j] += wv[j];
+		}
+	}
+
+	return;
+}
+
+
+void update( unsigned char *message, unsigned int len, 
+	unsigned int* pm_len, unsigned int* pm_tot_len, unsigned char* m_block, unsigned int* m_h)
+{
+	unsigned int block_nb;
+	unsigned int new_len, rem_len, tmp_len;
+	const unsigned char *shifted_message;
+	int m_len = *pm_len;
+
+	tmp_len = SHA224_256_BLOCK_SIZE - m_len;
+	rem_len = len < tmp_len ? len : tmp_len;
+	
+	//memcpy(&m_block[m_len], message, rem_len); ==>TBD
+	memcpy_ocl(&m_block[m_len], message, rem_len);
+	
+	if (m_len + len < SHA224_256_BLOCK_SIZE) {
+		m_len += len;
+		return;
+	}
+	new_len = len - rem_len;
+	block_nb = new_len / SHA224_256_BLOCK_SIZE;
+	shifted_message = message + rem_len;
+	
+	transform(m_block, 1, m_h);
+	
+	transform(shifted_message, block_nb, m_h);
+	
+	rem_len = new_len % SHA224_256_BLOCK_SIZE;
+	
+	//memcpy(m_block, &shifted_message[block_nb << 6], rem_len); == > TBD
+	
+	memcpy_ocl(m_block, &shifted_message[block_nb << 6], rem_len); 
+
+	*pm_len = rem_len;	
+	
+	*pm_tot_len += (block_nb + 1) << 6;
+
+}
+
+void final(unsigned char *digest, 
+	unsigned int m_len, unsigned int m_tot_len, unsigned char* m_block, unsigned int *m_h	)
+{
+	unsigned int block_nb;
+	unsigned int pm_len;
+	unsigned int len_b;
+	int i;
+	block_nb = (1 + ((SHA224_256_BLOCK_SIZE - 9)
+		< (m_len % SHA224_256_BLOCK_SIZE)));
+	len_b = (m_tot_len + m_len) << 3;
+//
+	pm_len = block_nb << 6;
+//
+////	memset(m_block + m_len, 0, pm_len - m_len); ==TBD
+	memzero_ocl(m_block + m_len,  pm_len - m_len); 
+	m_block[m_len] = 0x80;
+//
+	SHA2_UNPACK32(len_b, m_block + pm_len - 4);
+//
+	transform(m_block, block_nb, m_h);
+
+	for (i = 0; i < 8; i++) {
+		SHA2_UNPACK32(m_h[i], &digest[i << 2]);
+	}
+
+}
+
+
+void sha256(unsigned char* input, unsigned int inputlength, unsigned char* digest)
+{
+	//unsigned char digest[DIGEST_SIZE] = { 0 };
+	
+
+	unsigned int m_tot_len = 0;;
+	unsigned int m_len = 0;;
+	unsigned char m_block[2 * SHA224_256_BLOCK_SIZE];
+	unsigned int m_h[8];
+
+	m_h[0] = 0x6a09e667;
+	m_h[1] = 0xbb67ae85;
+	m_h[2] = 0x3c6ef372;
+	m_h[3] = 0xa54ff53a;
+	m_h[4] = 0x510e527f;
+	m_h[5] = 0x9b05688c;
+	m_h[6] = 0x1f83d9ab;
+	m_h[7] = 0x5be0cd19;
+
+	update(input, inputlength, &m_len, &m_tot_len, m_block, m_h );
+	
+	final(digest, m_len, m_tot_len, m_block, m_h);
+
+	char buf[2 * DIGEST_SIZE + 1];
+	buf[2 * DIGEST_SIZE] = 0;
+	
+	for (int i = 0; i < DIGEST_SIZE; i++)
+		//sprintf(buf + i * 2, "%02x", digest[i]);
+		printf("%02x", digest[i]);
+
+
+	return ;
+}
+
+
+
+
+
+__kernel void sha256_nonce_for_smaller_hash(
+	__global unsigned char* input,
+	int inlen,
+	__global unsigned char* out,
+	int outlen,
+	unsigned long startIndex,
+	__global unsigned char* targetHash
+)
 {
 	bool found = false;
 
@@ -814,17 +611,17 @@ __kernel void sha256_nonce_for_smaller_hash(
 	unsigned char digest[DIGEST_SIZE + 1] = { 0 };
 
 	unsigned long newStartIndex = startIndex + num;
-	
-	//if (num == 0)
-		//printf("\nStartIndex = %x\n", startIndex);
 
-	unsigned char inbuff[512] = {'\0'};
+	//if (num == 0)
+	//printf("\nStartIndex = %x\n", startIndex);
+
+	unsigned char inbuff[512] = { '\0' };
 
 	int inlength = inlen;
 
 	if (inlen > 512)
 	{
-		printf("CL - Kernel Error. Input is larger then(512) kernel can handle.*** inlen=[%d]\n", inlen );
+		printf("CL - Kernel Error. Input is larger then(512) kernel can handle.*** inlen=[%d]\n", inlen);
 		return;
 	}
 
@@ -842,17 +639,18 @@ __kernel void sha256_nonce_for_smaller_hash(
 	lenStart = myitoa(newStartIndex, tmp, 16); // base 16
 
 
-// still reverse function not working we have to redo reverse
+											   // still reverse function not working we have to redo reverse
 	unsigned char revTemp[64] = { '\0' };
 
 	for (int i = 0; i < lenStart; ++i)
 	{
 		revTemp[i] = tmp[lenStart - 1 - i];
 	}
+	
+	sha256(revTemp, lenStart , digest);
 
-	
-	int res = FindHashforInputString(revTemp, lenStart, digest);
-	
+	//int res = FindHashforInputString(revTemp, lenStart, digest);
+
 
 	//outlen = (DIGEST_SIZE)+final_length + 1;
 
@@ -863,13 +661,13 @@ __kernel void sha256_nonce_for_smaller_hash(
 	//	out[i] = '\0';
 	//}
 
-	for (int index = 0; index < inlength -1; index++)
+	for (int index = 0; index < inlength - 1; index++)
 	{
-	
+
 		if (inbuff[index] > digest[index])
 		{
 			found = true;
-			
+
 			//printf("KL[%x]: comparison check - t[%d] = [%02x]  > f[%02x]", newStartIndex, index, inbuff[index], digest[index]);
 			break;
 		}
@@ -879,10 +677,10 @@ __kernel void sha256_nonce_for_smaller_hash(
 			break;
 		}
 		else {
-			
+
 			//printf("KL[%d]: comparison check EQUALITY- t[%d] = [%02x] = f[%02x]", newStartIndex, index, inbuff[index], digest[index]);
 		}
-	
+
 	}
 
 
@@ -898,18 +696,18 @@ __kernel void sha256_nonce_for_smaller_hash(
 		//if (out[0] != '\0')
 		//	return;
 		//out[0] = 1;
-		printf("Found out[0]=null writing one time. nonce (newStartIndex) =  %x, lenStart = %d", newStartIndex, lenStart);
+		//printf("Found out[0]=null writing one time. nonce (newStartIndex) =  %x, lenStart = %d", newStartIndex, lenStart);
 		int len = 0;
 		while (out[len] != '\0') ++len;
 		out[len] = ',';
 		len += 1;
-		for (int i = len; i < len+lenStart; ++i)
+		for (int i = len; i < len + lenStart; ++i)
 		{
-			out[i] = revTemp[i-len];
+			out[i] = revTemp[i - len];
 			//printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, i, out[i], out[i]);
 		}
 
-		
+
 		//out[lenStart] = '-';
 		//
 		////printf("KL [%d]: out_hex[%d] = %02x, out_char : %c", num, lenStart, out[lenStart], out[lenStart]);
@@ -924,6 +722,6 @@ __kernel void sha256_nonce_for_smaller_hash(
 
 	}
 
-	
+
 	return;
 }

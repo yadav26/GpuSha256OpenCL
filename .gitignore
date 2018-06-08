@@ -1,0 +1,5 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/GpuSha256_OpenCL/GpuFindNonce_OCL_Next_LesserHash/x64/Debug
